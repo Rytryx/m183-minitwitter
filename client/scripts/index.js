@@ -34,27 +34,47 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const getFeed = async () => {
-    const query = "SELECT * FROM tweets ORDER BY id DESC";
-    const response = await fetch(`/api/feed?q=${query}`);
-    const tweets = await response.json();
-    const tweetsHTML = tweets.map(generateTweet).join("");
-    document.getElementById("feed").innerHTML = tweetsHTML;
+    try {
+      const query = "SELECT * FROM tweets ORDER BY id DESC";
+      const response = await fetch(`/api/feed?q=${query}`);
+      if (!response.ok) {
+        throw new Error("Fehler beim Abrufen des Feeds.");
+      }
+
+      const tweets = await response.json();
+      const tweetsHTML = tweets.map(generateTweet).join("");
+      document.getElementById("feed").innerHTML = tweetsHTML;
+    } catch (error) {
+      console.error(error.message);
+    }
   };
 
   const postTweet = async () => {
-    const username = user.username;
-    const timestamp = new Date().toISOString();
-    const text = newTweetInput.value;
-    const query = `INSERT INTO tweets (username, timestamp, text) VALUES ('${username}', '${timestamp}', '${text}')`;
-    await fetch("/api/feed", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ query }),
-    });
-    await getFeed();
-    newTweetInput.value = "";
+    try {
+      const user = JSON.parse(localStorage.getItem("user"));
+      const username = user.username;
+      const timestamp = new Date().toISOString();
+      const text = newTweetInput.value;
+
+      const response = await fetch("/api/feed", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user.token}`,
+        },
+        body: JSON.stringify({ username, timestamp, text }),
+      });
+
+      if (!response.ok) {
+        const responseData = await response.json();
+        throw new Error(responseData.error || "Fehler beim Erstellen des Posts.");
+      }
+
+      await getFeed();
+      newTweetInput.value = "";
+    } catch (error) {
+      console.error(error.message);
+    }
   };
 
   postTweetButton.addEventListener("click", postTweet);

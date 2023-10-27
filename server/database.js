@@ -1,3 +1,4 @@
+const bcrypt = require("bcrypt");
 const sqlite3 = require("sqlite3").verbose();
 
 const tweetsTableExists =
@@ -16,9 +17,9 @@ const createUsersTable = `CREATE TABLE users (
   password TEXT
 )`;
 const seedUsersTable = `INSERT INTO users (username, password) VALUES
-  ('switzerchees', '123456'),
-  ('john', '123456'),
-  ('jane', '123456')
+  ('switzerchees', '${bcrypt.hashSync('123456', 10)}'),
+  ('john', '${bcrypt.hashSync('123456', 10)}'),
+  ('jane', '${bcrypt.hashSync('123456', 10)}')
 `;
 
 const initializeDatabase = async () => {
@@ -26,17 +27,30 @@ const initializeDatabase = async () => {
 
   db.serialize(() => {
     db.get(tweetsTableExists, [], async (err, row) => {
-      if (err) return console.error(err.message);
+      if (err) {
+        console.error(err.message);
+        return;
+      }
       if (!row) {
-        await db.run(createTweetsTable);
+        await db.run(createTweetsTable, (err) => {
+          if (err) console.error(err.message);
+        });
       }
     });
     db.get(usersTableExists, [], async (err, row) => {
-      if (err) return console.error(err.message);
+      if (err) {
+        console.error(err.message);
+        return;
+      }
       if (!row) {
         db.run(createUsersTable, [], async (err) => {
-          if (err) return console.error(err.message);
-          db.run(seedUsersTable);
+          if (err) {
+            console.error(err.message);
+            return;
+          }
+          db.run(seedUsersTable, (err) => {
+            if (err) console.error(err.message);
+          });
         });
       }
     });
@@ -54,13 +68,22 @@ const insertDB = (db, query) => {
   });
 };
 
-const queryDB = (db, query) => {
+const queryDB = (db, query, params) => {
   return new Promise((resolve, reject) => {
-    db.all(query, [], (err, rows) => {
+    db.all(query, [params], (err, rows) => {
       if (err) return reject(err);
       resolve(rows);
     });
   });
 };
 
-module.exports = { initializeDatabase, queryDB, insertDB };
+const queryDBWithParams = (db, query, params) => {
+  return new Promise((resolve, reject) => {
+    db.all(query, params, (err, rows) => {
+      if (err) return reject(err);
+      resolve(rows);
+    });
+  });
+};
+
+module.exports = { initializeDatabase, queryDB, insertDB, queryDBWithParams };
